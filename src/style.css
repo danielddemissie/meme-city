@@ -1,0 +1,53 @@
+:root {
+  color-scheme: dark;
+  --color-void: oklch(0.105 0 0);
+  --color-surface: oklch(0.15 0.008 120);
+  --color-primary: oklch(0.56 0.09 120);
+  --color-ink: oklch(0.93 0.01 120);
+  --color-muted: oklch(0.72 0.012 120);
+  --color-accent: oklch(0.78 0.15 85);
+  --color-danger: oklch(0.62 0.19 25);
+  font-family: "Courier New", Courier, monospace;
+  background: var(--color-void);
+  color: var(--color-ink);
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#game {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background: var(--color-void);
+}
+
+#game {
+  display: grid;
+  place-items: center;
+}
+
+canvas {
+  display: block;
+  outline: 1px solid oklch(0.24 0.008 120);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
