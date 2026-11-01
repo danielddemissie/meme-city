@@ -83,10 +83,20 @@ export class StarterRoomScene extends Phaser.Scene {
       this.load.image(image.key, image.file);
     }
     void (async () => {
-      for (const slot of MEME_PACK_SLOTS) {
-        for (const extension of ['mp3', 'wav', 'ogg']) {
-          if (await Audio.probePack(slot, `memes/${slot}.${extension}`)) break;
+      try {
+        const response = await fetch('memes/pack.json', { cache: 'no-cache' });
+        if (!response.ok) return;
+        const manifest: unknown = await response.json();
+        if (!manifest || typeof manifest !== 'object') return;
+        const files = manifest as Record<string, unknown>;
+        for (const slot of MEME_PACK_SLOTS) {
+          const file = files[slot];
+          if (typeof file === 'string' && /^[\w.-]+$/.test(file)) {
+            await Audio.probePack(slot, `memes/${file}`);
+          }
         }
+      } catch {
+        return;
       }
     })();
   }

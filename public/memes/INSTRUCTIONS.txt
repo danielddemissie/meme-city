@@ -10,7 +10,17 @@ Install custom audio without rebuilding:
 2. Drag the file onto the game window. MP3, WAV, and OGG are supported.
 3. A notice confirms that the slot was registered.
 
-The same filenames can be placed in this directory before running npm run build.
+To bundle audio instead, place files in this directory and list them in pack.json.
+Example pack.json:
+{
+  "spotted": "spotted.mp3",
+  "blink": "blink.wav",
+  "win": "win.ogg",
+  "fail": "fail.mp3",
+  "voice": "voice.mp3"
+}
+Then run npm run build. Unlisted slots are never requested.
+
 Custom audio exists only for the current browser session when dropped onto the game.
 Synth cues play whenever a slot has no custom audio.
 
