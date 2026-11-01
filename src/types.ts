@@ -5,11 +5,25 @@ export type Pressure = 'story' | 'standard' | 'relentless';
 export type FlashIntensity = 'off' | 'low' | 'full';
 export type ObservationStatus = 'observed' | 'unseen' | 'occluded' | 'blinking' | 'intake';
 
+export interface StaffMember {
+  id: string;
+  name: string;
+  role: string;
+  texture: string;
+  tint: number;
+  speedFactor: number;
+  focusFactor: number;
+  knockPattern: readonly number[];
+  voice: 'knock' | 'squeak' | 'engine' | 'taps' | 'whistle';
+  notice: string;
+}
+
 export interface AccessibilitySettings {
   pressure: Pressure;
   reducedMotion: boolean;
   flashIntensity: FlashIntensity;
   screenEffects: boolean;
+  audio: boolean;
 }
 
 export interface PlayerEntity {

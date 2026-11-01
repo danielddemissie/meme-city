@@ -1,12 +1,16 @@
 import Phaser from 'phaser';
+import { Audio } from '../game/Audio';
 import { Hud } from '../game/Hud';
 import { Lighting } from '../game/Lighting';
 import { Room } from '../game/Room';
 import {
   COLORS,
   FONT_FAMILY,
+  MEME_PACK_SLOTS,
   PRESSURE_FOCUS_SECONDS,
   PRESSURE_SPEED,
+  ROSTER,
+  ROSTER_IMAGES,
   WORLD_BOTTOM,
   WORLD_PADDING,
   WORLD_TOP,
@@ -17,6 +21,7 @@ import type {
   GameState,
   ObservationStatus,
   PlayerEntity,
+  StaffMember,
   TemplateKeyItem,
 } from '../types';
 
@@ -27,9 +32,14 @@ const BACKPEDAL_MULTIPLIER = 0.72;
 
 type MovementKeys = Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>;
 
+const KNOCK_INTERVAL = 2000;
+const TICK_INTERVAL = 500;
+
 export class StarterRoomScene extends Phaser.Scene {
   private player!: PlayerEntity;
   private enemy!: EnemyEntity;
+  private staff!: StaffMember;
+  private nameplate?: Phaser.GameObjects.Text;
   private templateKey!: TemplateKeyItem;
   private exitDoor!: Phaser.Physics.Arcade.Sprite;
   private room!: Room;
@@ -45,6 +55,9 @@ export class StarterRoomScene extends Phaser.Scene {
   private noticeRemaining = 0;
   private noticeLockUntil = 0;
   private pointerAim = false;
+  private lastObservation: ObservationStatus = 'intake';
+  private knockTimer = 0;
+  private tickTimer = 0;
   private readonly movement = new Phaser.Math.Vector2();
   private readonly toEnemy = new Phaser.Math.Vector2();
   private readonly toPlayer = new Phaser.Math.Vector2();
@@ -58,7 +71,24 @@ export class StarterRoomScene extends Phaser.Scene {
       reducedMotion: prefersReducedMotion,
       flashIntensity: 'full',
       screenEffects: true,
+      audio: true,
     };
+  }
+
+  preload(): void {
+    this.load.on('loaderror', (file: Phaser.Loader.File) => {
+      console.warn(`memecity: asset failed to load (${file.key})`);
+    });
+    for (const image of ROSTER_IMAGES) {
+      this.load.image(image.key, image.file);
+    }
+    void (async () => {
+      for (const slot of MEME_PACK_SLOTS) {
+        for (const extension of ['mp3', 'wav', 'ogg']) {
+          if (await Audio.probePack(slot, `memes/${slot}.${extension}`)) break;
+        }
+      }
+    })();
   }
 
   create(): void {
@@ -67,9 +97,18 @@ export class StarterRoomScene extends Phaser.Scene {
     this.noticeRemaining = 0;
     this.noticeLockUntil = 0;
     this.pointerAim = false;
+    this.lastObservation = 'intake';
+    this.knockTimer = 0;
+    this.tickTimer = 0;
 
     this.createTextures();
     this.room = new Room(this);
+
+    const requestedStaff = new URLSearchParams(window.location.search).get('staff');
+    this.staff = ROSTER.find((member) => member.id === requestedStaff) ?? Phaser.Math.RND.pick([...ROSTER]);
+    if (!this.textures.exists(this.staff.texture)) {
+      this.staff = ROSTER[0];
+    }
 
     this.physics.world.setBounds(
       WORLD_PADDING,
@@ -105,16 +144,29 @@ export class StarterRoomScene extends Phaser.Scene {
       blinkRemaining: 0,
     };
 
-    const enemySprite = this.physics.add.sprite(760, 150, 'glancing-man');
+    const enemySprite = this.physics.add.sprite(760, 150, this.staff.texture);
     enemySprite.setDepth(6);
     enemySprite.setCollideWorldBounds(true);
+    if (this.staff.texture !== 'glancing-man') {
+      enemySprite.setScale(0.2);
+    }
     const enemyBody = enemySprite.body as Phaser.Physics.Arcade.Body;
-    enemyBody.setSize(24, 30, true);
+    enemyBody.setSize(this.staff.texture === 'glancing-man' ? 24 : 220, this.staff.texture === 'glancing-man' ? 30 : 280, true);
     this.enemy = {
       sprite: enemySprite,
       observed: false,
       escalated: false,
     };
+
+    this.nameplate = this.add
+      .text(enemySprite.x, enemySprite.y - 42, this.staff.name, {
+        color: '#a4c477',
+        fontFamily: FONT_FAMILY,
+        fontSize: '9px',
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(11)
+      .setAlpha(0);
 
     this.physics.add.collider(playerSprite, this.room.obstacles);
     this.physics.add.overlap(playerSprite, this.templateKey.sprite, this.collectTemplateKey, undefined, this);
@@ -140,15 +192,25 @@ export class StarterRoomScene extends Phaser.Scene {
     keyboard.on('keydown-TWO', this.toggleReducedMotion, this);
     keyboard.on('keydown-THREE', this.cycleFlash, this);
     keyboard.on('keydown-FOUR', this.toggleScreenEffects, this);
+    keyboard.on('keydown-FIVE', this.toggleAudio, this);
 
     const onEscape = (event: KeyboardEvent): void => {
       if (event.key === 'Escape' && !event.repeat) {
         this.handlePause();
       }
     };
+    const onDragOver = (event: DragEvent): void => event.preventDefault();
+    const onDrop = (event: DragEvent): void => {
+      event.preventDefault();
+      void this.handleMemePackDrop(event);
+    };
     window.addEventListener('keydown', onEscape);
+    window.addEventListener('dragover', onDragOver);
+    window.addEventListener('drop', onDrop);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       window.removeEventListener('keydown', onEscape);
+      window.removeEventListener('dragover', onDragOver);
+      window.removeEventListener('drop', onDrop);
     });
 
     this.input.on('pointerdown', this.handlePrimary, this);
@@ -157,7 +219,7 @@ export class StarterRoomScene extends Phaser.Scene {
     });
 
     this.lighting = new Lighting(this);
-    this.hud = new Hud(this);
+    this.hud = new Hud(this, this.staff);
     this.hud.update({
       elapsedSeconds: 0,
       hasKey: false,
@@ -187,10 +249,12 @@ export class StarterRoomScene extends Phaser.Scene {
     this.updatePlayer();
     const observation = this.evaluateObservation();
     this.updateFocusAndBlink(delta, observation);
-    this.updateEnemy(observation);
+    this.updateEnemy(observation, delta);
+    this.updateNameplate(observation);
     this.updateKeyPulse();
     this.updateNotices(delta);
     this.lighting.update(this.player, this.player.facing, this.player.blinkRemaining, this.settings);
+    this.tickFocusAudio(delta, observation);
     this.hud.update({
       elapsedSeconds: this.elapsed,
       hasKey: this.templateKey.collected,
@@ -279,10 +343,11 @@ export class StarterRoomScene extends Phaser.Scene {
     }
 
     if (observation === 'observed') {
-      const drain = seconds / PRESSURE_FOCUS_SECONDS[this.settings.pressure];
+      const drain = seconds / (PRESSURE_FOCUS_SECONDS[this.settings.pressure] * this.staff.focusFactor);
       this.player.focus = Math.max(0, this.player.focus - drain);
       if (this.player.focus === 0) {
         this.player.blinkRemaining = this.settings.reducedMotion ? 0.16 : 0.32;
+        this.playCue('blink');
         this.showNoticeAfterLock('INVOLUNTARY BLINK LOGGED.', '#c45347');
       }
       return;
@@ -298,12 +363,30 @@ export class StarterRoomScene extends Phaser.Scene {
 
     this.graceRemaining = Math.max(0, this.graceRemaining - delta / 1000);
     if (this.graceRemaining === 0) {
-      this.showNoticeAfterLock('INTAKE CLOSED.', '#e0a34a');
+      this.showNoticeAfterLock(`INTAKE CLOSED. ${this.staff.notice}`, '#e0a34a');
     }
   }
 
-  private updateEnemy(observation: ObservationStatus): void {
+  private updateEnemy(observation: ObservationStatus, delta: number): void {
+    const wasHeld = this.enemy.observed || this.graceRemaining > 0;
     this.enemy.observed = observation === 'observed';
+
+    if (observation !== this.lastObservation) {
+      if (this.enemy.observed && !wasHeld) {
+        this.playCue('spotted');
+      }
+      if (wasHeld && !this.enemy.observed && observation === 'unseen') {
+        this.playVoice();
+        this.knockTimer = KNOCK_INTERVAL;
+      }
+      this.lastObservation = observation;
+    } else if (!this.enemy.observed && observation === 'unseen' && !wasHeld) {
+      this.knockTimer -= delta;
+      if (this.knockTimer <= 0) {
+        this.playVoice();
+        this.knockTimer = KNOCK_INTERVAL;
+      }
+    }
 
     if (this.graceRemaining > 0 || this.enemy.observed) {
       this.enemy.sprite.setVelocity(0, 0);
@@ -320,8 +403,55 @@ export class StarterRoomScene extends Phaser.Scene {
     }
 
     this.toPlayer.normalize();
-    const speed = PRESSURE_SPEED[this.settings.pressure] * (this.enemy.escalated ? 1.3 : 1);
+    const speed =
+      PRESSURE_SPEED[this.settings.pressure] * this.staff.speedFactor * (this.enemy.escalated ? 1.3 : 1);
     this.enemy.sprite.setVelocity(this.toPlayer.x * speed, this.toPlayer.y * speed);
+  }
+
+  private updateNameplate(observation: ObservationStatus): void {
+    if (!this.nameplate) {
+      return;
+    }
+    const holding = observation === 'observed' || observation === 'intake';
+    this.nameplate
+      .setPosition(this.enemy.sprite.x, this.enemy.sprite.y - (this.staff.texture === 'glancing-man' ? 42 : 56))
+      .setAlpha(holding ? 0.9 : 0)
+      .setText(`${this.staff.name.toUpperCase()} — ${holding ? 'HOLDING' : 'DESKED'}`);
+  }
+
+  private playVoice(): void {
+    if (!this.settings.audio) {
+      return;
+    }
+    const packBuffer = Audio.packFor('voice');
+    if (packBuffer) {
+      Audio.playPack(packBuffer, 0.65);
+      return;
+    }
+    Audio.elapse(this.staff.voice, this.staff.knockPattern);
+  }
+
+  private playCue(cue: 'spotted' | 'blink' | 'win' | 'fail'): void {
+    if (!this.settings.audio) {
+      return;
+    }
+    const packBuffer = Audio.packFor(cue);
+    if (packBuffer) {
+      Audio.playPack(packBuffer);
+      return;
+    }
+    Audio.elapse(cue);
+  }
+
+  private tickFocusAudio(delta: number, observation: ObservationStatus): void {
+    if (!this.settings.audio || observation !== 'observed' || this.player.focus > 0.45) {
+      return;
+    }
+    this.tickTimer -= delta;
+    if (this.tickTimer <= 0) {
+      this.tickTimer = TICK_INTERVAL;
+      Audio.elapse('tick');
+    }
   }
 
   private updateKeyPulse(): void {
@@ -396,9 +526,11 @@ export class StarterRoomScene extends Phaser.Scene {
     this.enemy.sprite.setVelocity(0, 0);
     this.physics.world.pause();
     this.hud.showOutcome(nextState === 'won', this.elapsed, this.enemy.escalated);
+    this.playCue(nextState === 'won' ? 'win' : 'fail');
   }
 
   private startRun(): void {
+    Audio.unlock();
     this.hasBriefed = true;
     this.state = 'playing';
     this.graceRemaining = 2.5;
@@ -477,6 +609,14 @@ export class StarterRoomScene extends Phaser.Scene {
     this.hud.updateSettings(this.settings);
   }
 
+  private toggleAudio(): void {
+    this.settings.audio = !this.settings.audio;
+    if (this.settings.audio) {
+      Audio.unlock();
+    }
+    this.hud.updateSettings(this.settings);
+  }
+
   private showNoticeAfterLock(text: string, color: string): void {
     if (this.time.now < this.noticeLockUntil) {
       return;
@@ -484,6 +624,23 @@ export class StarterRoomScene extends Phaser.Scene {
     this.noticeLockUntil = this.time.now + 900;
     this.noticeRemaining = 1800;
     this.hud.showNotice(text, color);
+  }
+
+  private async handleMemePackDrop(event: DragEvent): Promise<void> {
+    const files = Array.from(event.dataTransfer?.files ?? []);
+    for (const file of files) {
+      const match = file.name.toLowerCase().match(/^([a-z]+)\.(mp3|wav|ogg)$/);
+      const slot = match ? MEME_PACK_SLOTS.find((candidate) => candidate === match[1]) : undefined;
+      if (!slot) {
+        this.showNoticeAfterLock('MEME PACK: USE SPOTTED, BLINK, WIN, FAIL, OR VOICE.', '#c45347');
+        continue;
+      }
+      const decoded = await Audio.decode(slot, await file.arrayBuffer());
+      this.showNoticeAfterLock(
+        decoded ? `MEME PACK: ${slot.toUpperCase()} REGISTERED.` : `MEME PACK: ${slot.toUpperCase()} COULD NOT BE DECODED.`,
+        decoded ? '#a4c477' : '#c45347',
+      );
+    }
   }
 
   private installDebugProbe(): void {
@@ -500,6 +657,8 @@ export class StarterRoomScene extends Phaser.Scene {
         hasKey: this.templateKey?.collected,
         key: this.templateKey ? { x: this.templateKey.sprite.x, y: this.templateKey.sprite.y } : null,
         settings: { ...this.settings },
+        staff: this.staff?.id,
+        pack: Audio.packSlots().filter((slot) => Audio.packFor(slot)),
       }),
       teleportPlayer: (x: number, y: number) => this.player?.sprite.setPosition(x, y),
       teleportEnemy: (x: number, y: number) => this.enemy?.sprite.setPosition(x, y),

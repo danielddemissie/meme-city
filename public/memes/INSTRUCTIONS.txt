@@ -1,0 +1,25 @@
+MEME CITY MEME PACK
+
+Install custom audio without rebuilding:
+1. Name an audio file after one of these event slots:
+   spotted.mp3  - your gaze catches the staff member
+   blink.mp3    - involuntary blink
+   win.mp3      - escape granted
+   fail.mp3     - containment failure
+   voice.mp3    - current staff member's movement voice
+2. Drag the file onto the game window. MP3, WAV, and OGG are supported.
+3. A notice confirms that the slot was registered.
+
+The same filenames can be placed in this directory before running npm run build.
+Custom audio exists only for the current browser session when dropped onto the game.
+Synth cues play whenever a slot has no custom audio.
+
+Lock the nightly staff member with a URL parameter:
+?staff=glancing
+?staff=tung
+?staff=tralalero
+?staff=bombardiro
+?staff=ballerina
+?staff=patapim
+
+Only use audio you have permission to use.

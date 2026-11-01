@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { COLORS, FONT_FAMILY, GAME_HEIGHT, GAME_WIDTH } from '../theme';
-import type { AccessibilitySettings, HudSnapshot, ObservationStatus } from '../types';
+import type { AccessibilitySettings, HudSnapshot, ObservationStatus, StaffMember } from '../types';
 
 const LABEL_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
   color: '#a4aa9a',
@@ -14,13 +14,15 @@ const INK_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
   fontSize: '18px',
 };
 
-const OBSERVATION_LABELS: Record<ObservationStatus, { text: string; color: string }> = {
-  observed: { text: 'GLANCING MAN: OBSERVED — HOLDING', color: '#a4c477' },
-  unseen: { text: 'GLANCING MAN: UNOBSERVED — MOVING', color: '#c45347' },
-  occluded: { text: 'GLANCING MAN: OCCLUDED — MOVING', color: '#e0a34a' },
-  blinking: { text: 'GLANCING MAN: BLINKING — EXPOSED', color: '#c45347' },
-  intake: { text: 'GLANCING MAN: INTAKE TRIAL — HOLDING', color: '#a4aa9a' },
-};
+function observationLabels(staffName: string): Record<ObservationStatus, { text: string; color: string }> {
+  return {
+    observed: { text: `${staffName}: OBSERVED — HOLDING`, color: '#a4c477' },
+    unseen: { text: `${staffName}: UNOBSERVED — MOVING`, color: '#c45347' },
+    occluded: { text: `${staffName}: OCCLUDED — MOVING`, color: '#e0a34a' },
+    blinking: { text: `${staffName}: BLINKING — EXPOSED`, color: '#c45347' },
+    intake: { text: `${staffName}: INTAKE TRIAL — HOLDING`, color: '#a4aa9a' },
+  };
+}
 
 function formatTime(seconds: number): string {
   const minutes = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -35,6 +37,7 @@ function focusMeter(focus: number): string {
 
 export class Hud {
   private readonly scene: Phaser.Scene;
+  private readonly staff: StaffMember;
   private readonly statusText: Phaser.GameObjects.Text;
   private readonly timerText: Phaser.GameObjects.Text;
   private readonly keyText: Phaser.GameObjects.Text;
@@ -44,8 +47,9 @@ export class Hud {
   private readonly noticeText: Phaser.GameObjects.Text;
   private overlay?: Phaser.GameObjects.Container;
 
-  constructor(scene: Phaser.Scene) {
+  constructor(scene: Phaser.Scene, staff: StaffMember) {
     this.scene = scene;
+    this.staff = staff;
 
     scene.add.rectangle(GAME_WIDTH / 2, 56, GAME_WIDTH, 112, COLORS.void).setDepth(25);
     scene.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT - 20, GAME_WIDTH, 40, COLORS.void).setDepth(25);
@@ -62,13 +66,13 @@ export class Hud {
     this.timerText = scene.add.text(GAME_WIDTH - 40, 22, 'RUN 00:00', { ...LABEL_STYLE, color: '#e7eadf' }).setOrigin(1, 0).setDepth(30);
     this.keyText = scene.add.text(GAME_WIDTH - 40, 46, 'KEY: NOT ISSUED', { ...LABEL_STYLE, color: '#a4aa9a' }).setOrigin(1, 0).setDepth(30);
 
-    scene.add.text(40, 82, 'PROCEDURE: KEEP THE GLANCING MAN INSIDE YOUR VIEW.', { ...LABEL_STYLE, fontSize: '11px' }).setDepth(30);
+    scene.add.text(40, 82, `PROCEDURE: KEEP ${staff.name} INSIDE YOUR VIEW.`, { ...LABEL_STYLE, fontSize: '11px' }).setDepth(30);
     this.statusText = scene.add.text(GAME_WIDTH - 40, 84, '', { ...LABEL_STYLE }).setOrigin(1, 0).setDepth(30);
     this.focusText = scene.add.text(576, 84, 'EYE CONTACT [==========]', LABEL_STYLE).setOrigin(0.5, 0).setDepth(30);
 
     this.settingsText = scene.add.text(40, GAME_HEIGHT - 32, '', LABEL_STYLE).setDepth(30);
     scene.add
-      .text(GAME_WIDTH - 40, GAME_HEIGHT - 32, 'ESC PAUSE · [1-4] PARAMETERS · R RESTART', { ...LABEL_STYLE, fontSize: '11px' })
+      .text(GAME_WIDTH - 40, GAME_HEIGHT - 32, 'ESC PAUSE · [1-5] PARAMETERS · R RESTART', { ...LABEL_STYLE, fontSize: '11px' })
       .setOrigin(1, 0)
       .setDepth(30);
 
@@ -76,6 +80,8 @@ export class Hud {
       .text(GAME_WIDTH / 2, 636, '', {
         ...LABEL_STYLE,
         fontSize: '15px',
+        align: 'center',
+        wordWrap: { width: GAME_WIDTH - 120 },
       })
       .setOrigin(0.5, 0.5)
       .setAlpha(0)
@@ -88,7 +94,7 @@ export class Hud {
       .setText(snapshot.hasKey ? 'KEY: POSSESSED' : 'KEY: NOT ISSUED')
       .setColor(snapshot.hasKey ? '#a4c477' : '#a4aa9a');
 
-    const observation = OBSERVATION_LABELS[snapshot.observation];
+    const observation = observationLabels(this.staff.name)[snapshot.observation];
     this.statusText.setText(observation.text).setColor(observation.color);
 
     this.focusText.setText(`EYE CONTACT ${focusMeter(snapshot.focus)}`);
@@ -114,27 +120,27 @@ export class Hud {
       this.makeOverlayTitle('MEME CITY', '#e7eadf', 58, 134),
       this.makeOverlayTitle('BRAINROT ESCAPE', '#a4c477', 25, 192),
       this.makeOverlayText(80, 234, 'DEPARTMENT OF PUBLIC CONTAINMENT — NIGHT DESK', '13px', '#a4aa9a'),
-      this.makeOverlayText(80, 278, 'NOTICE 06: THE GLANCING MAN', '20px', '#e7eadf'),
+      this.makeOverlayText(80, 278, `NOTICE 06: ${this.staff.name}`, '20px', '#e7eadf'),
       this.makeOverlayText(
         80,
         308,
-        'It approaches only outside your direct, unobstructed view.\nLooking at it holds it still. Furniture obstructs sight. He is not obstructed.\nThe run opens under intake observation. He begins when intake closes.\nRecover the Template Key. Leave through Exit 04.',
+        'Duty roster rotates nightly. Tonight you report on the figure named above.\nIt approaches only outside your direct, unobstructed view.\nLooking at it holds it still. Furniture obstructs sight. It does not.\nThe run opens under intake observation. It begins when intake closes.\nRecover the Template Key. Leave through Exit 04.',
         '15px',
         '#c9cec0',
         20,
       ),
-      this.makeOverlayText(80, 440, 'CONTROLS', '13px', '#a4aa9a'),
+      this.makeOverlayText(80, 480, 'CONTROLS', '13px', '#a4aa9a'),
       this.makeOverlayText(
         80,
-        464,
+        504,
         'WASD / ARROWS — MOVE\nMOUSE — DIRECT VIEW\nESC — PAUSE / PARAMETERS\nR — RESTART RUN',
         '14px',
         '#a4aa9a',
         14,
       ),
-      this.makeOverlayText(640, 440, 'RUN PARAMETERS', '13px', '#a4aa9a'),
-      this.makeSettingsBlock(640, 464, settings, 14),
-      this.makeOverlayText(80, 596, 'ENTER / CLICK — SIGN AND BEGIN', '20px', '#e0a34a'),
+      this.makeOverlayText(640, 480, 'RUN PARAMETERS', '13px', '#a4aa9a'),
+      this.makeSettingsBlock(640, 504, settings, 10),
+      this.makeOverlayText(80, 620, 'ENTER / CLICK — SIGN AND BEGIN', '20px', '#e0a34a'),
     ]);
   }
 
@@ -143,8 +149,10 @@ export class Hud {
       this.makeOverlayTitle('PAUSED', '#e7eadf', 44, 200),
       this.makeOverlayText(80, 258, 'INSPECTION SUSPENDED. THE RECORD REMAINS OPEN.', '14px', '#a4aa9a'),
       this.makeOverlayText(80, 306, 'RUN PARAMETERS', '13px', '#a4aa9a'),
-      this.makeSettingsBlock(80, 336, settings, 14),
+      this.makeSettingsBlock(80, 336, settings, 12),
       this.makeOverlayText(80, 500, 'ESC — RESUME          R — RESTART RUN', '18px', '#e0a34a'),
+      this.makeOverlayText(80, 566, 'MEME PACK: DROP SPOTTED / BLINK / WIN / FAIL / VOICE AUDIO ONTO THE GAME.', '12px', '#a4aa9a'),
+      this.makeOverlayText(80, 588, 'MP3, WAV, OR OGG. SYNTH AUDIO PLAYS WHEN NO CUSTOM FILE IS INSTALLED.', '11px', '#738c50'),
     ]);
   }
 
@@ -234,6 +242,7 @@ export class Hud {
       `MOTION ${settings.reducedMotion ? 'REDUCED' : 'FULL'}`,
       `FLASH ${settings.flashIntensity.toUpperCase()}`,
       `FX ${settings.screenEffects ? 'ON' : 'OFF'}`,
+      `AUDIO ${settings.audio ? 'ON' : 'OFF'}`,
     ].join('   ');
   }
 
@@ -243,6 +252,7 @@ export class Hud {
       `[2] REDUCED MOTION: ${settings.reducedMotion ? 'ON' : 'OFF'}`,
       `[3] FLASH INTENSITY: ${settings.flashIntensity.toUpperCase()}`,
       `[4] SCREEN EFFECTS: ${settings.screenEffects ? 'ON' : 'OFF'}`,
+      `[5] AUDIO: ${settings.audio ? 'ON' : 'OFF'}`,
     ].join('\n');
   }
 }

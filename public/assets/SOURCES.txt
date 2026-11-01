@@ -1,0 +1,22 @@
+Roster image sources
+
+The following files were retrieved from Wikimedia Commons. The Commons API reported
+LicenseShortName "Public domain" for each source at retrieval time.
+
+tung.png
+https://commons.wikimedia.org/wiki/File:Full_image_of_Tung_Tung_Tung_Sahur.png
+
+tralalero.webp
+https://commons.wikimedia.org/wiki/File:Tralalero_Tralala.webp
+
+bombardiro.jpg
+https://commons.wikimedia.org/wiki/File:Bombardiro_Crocodillo.jpg
+
+ballerina.png
+https://commons.wikimedia.org/wiki/File:Ballerina_Cappuccina.png
+
+patapim.jpg
+https://commons.wikimedia.org/wiki/File:Brr_brr_patapim.jpg
+
+The Glancing Man, player, key, exit door, furniture, and lighting are generated in code.
+No meme audio files are bundled with the game.

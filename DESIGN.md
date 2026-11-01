@@ -13,7 +13,7 @@ A lone applicant is trapped in a windowless records office after midnight, readi
 
 The visual direction combines Control's institutional unease, Papers, Please's procedural pressure, and the impersonal hierarchy of civic forms. Responsive motion communicates detection, authorization, and failure only. It never turns the run into a choreographed menu experience.
 
-**Implemented stack:** TypeScript + Phaser 3.90 (Vite), 1152×720 canvas (FIT scale). All art is procedural — no image assets. Sprites are `Graphics.generateTexture` (`player` 30×30, `glancing-man` 44×56, `template-key` 24×24, `exit-door` 24×112, `pixel` 1×1) and the flashlight cone is a canvas radial gradient used as a RenderTexture mask.
+**Implemented stack:** TypeScript + Phaser 3.90 (Vite), 1152×720 canvas (FIT scale). The room, player, key, exit door, and Glancing Man are procedural (`Graphics.generateTexture`); the five brainrot staff renders are local public-domain Wikimedia images displayed at 100×100. The flashlight cone is a canvas radial gradient used as a RenderTexture mask. Roster source provenance ships in `public/assets/SOURCES.txt`.
 
 **Key Characteristics:**
 - Restrained institutional olive against near-black architecture
@@ -90,11 +90,13 @@ Overlays separate themselves with a solid `void` backdrop at 0.92 opacity and a 
 | **Top band** (depth 25) | Void band + two 1px `wallEdge@0.7` rules bound the record — header, objectives, timer, key status, procedure line, enemy status, eye meter | `void`, `wallEdge`, `ink`, `muted` |
 | **Objective record** (top-left) | Numbered list; collected key flips to `TEMPLATE KEY POSSESSED` | `ink`, `muted` |
 | **Status line + eye meter** (top-right / center) | Enemy state sentence and `EYE CONTACT [====----]` | text color per state (`muted`/`amber`/`red`) |
-| **Notices** (bottom ticker, depth 31) | One-line procedural notices ("INTAKE CLOSED.", "AUTHORIZATION UPDATED.") | `amber` / `olive` |
-| **Run-parameter panel** (briefing/pause overlay) | Settings listed as filed parameters `[1]–[4]`, mirrored in the footer | `ink` |
+| **Notices** (bottom ticker, depth 31) | Wrapped procedural notices, including staff intake and meme-pack registration | `amber` / `olive` |
+| **Run-parameter panel** (briefing/pause overlay) | Settings listed as filed parameters `[1]–[5]`, mirrored in the footer | `ink` |
 | **Outcome overlay** | `ACCESS GRANTED` (oliveBright) vs `CONTAINMENT FAILURE` (red), filing time, `R — NEW RUN` | `oliveBright`, `red`, `amber` |
 | **Exit door** | Recessed wall panel; red until authorized; olive `AUTHORIZED` stencil + door-piece glow when the key is held | `red`, `olive`, `oliveBright` |
 | **Glancing Man** | 44×56 silhouette with a single pale eye — brightens when unobserved | `void`, `ink` |
+| **Brainrot staff roster** | Five real public-domain renders with per-staff speed, focus pressure, voice pattern, and a gaze-visible nameplate | staff imagery, `oliveBright` |
+| **Meme pack** | Runtime drag-and-drop audio replacement for `spotted`, `blink`, `win`, `fail`, and `voice`; synth cues remain the fallback | pause-overlay instructions, `muted` / `olive` |
 
 ## 6. Accessibility & Parameters
 
@@ -104,8 +106,9 @@ Overlays separate themselves with a solid `void` backdrop at 0.92 opacity and a 
 | Reduced motion | `2` | off (camera shake, 0.32s blink hold, moving grain) / on (no shake, 0.16s blink hold, still grain) | matches OS `prefers-reduced-motion` |
 | Flash intensity | `3` | full / low / off | full |
 | Screen effects | `4` | on / off | on |
+| Audio | `5` | on / off | on |
 
-All four cycle anywhere in play, appear in the pause overlay, and are permanently summarized in the footer (`PRESSURE STANDARD MOTION FULL FLASH FULL FX ON`).
+All five cycle anywhere in play, appear in the pause overlay, and are permanently summarized in the footer (`PRESSURE STANDARD MOTION FULL FLASH FULL FX ON AUDIO ON`).
 
 ## 7. Do's and Don'ts
 
@@ -113,7 +116,7 @@ All four cycle anywhere in play, appear in the pause overlay, and are permanentl
 
 - **Do** keep the playfield dominant and make every persistent label useful to the current run.
 - **Do** pair every gameplay color with text, shape, or motion so no rule depends on color alone.
-- **Do** provide reduced motion, enemy-pressure, screen-effects, and flash-intensity controls.
+- **Do** provide reduced motion, enemy-pressure, screen-effects, flash-intensity, and audio controls.
 - **Do** make administrative messages brief, deadpan, and immediately actionable.
 
 ### Don't:
